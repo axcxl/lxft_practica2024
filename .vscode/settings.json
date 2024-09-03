@@ -13,5 +13,8 @@
     "idf.port": "/dev/ttyUSB0",
     "idf.pythonBinPath": "/home/vlad/.espressif/python_env/idf5.4_py3.12_env/bin/python",
     "idf.toolsPath": "/home/vlad/.espressif",
-    "idf.flashType": "UART"
+    "idf.flashType": "UART",
+    "files.associations": {
+        "ethernet_init.h": "c"
+    }
 }

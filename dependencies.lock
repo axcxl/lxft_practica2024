@@ -1,0 +1,15 @@
+dependencies:
+  ethernet_init:
+    component_hash: null
+    source:
+      path: /home/vlad/esp/esp-idf/examples/ethernet/basic/components/ethernet_init
+      type: local
+    version: '*'
+  idf:
+    component_hash: null
+    source:
+      type: idf
+    version: 5.4.0
+manifest_hash: 30034bd2690725f2273959e9d91661b239e72ca400730c6b290af955eca8dacb
+target: esp32
+version: 1.0.0
