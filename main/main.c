@@ -57,16 +57,20 @@ void core_i2c(void* arg){
     TickType_t xLastWakeTime;
     const TickType_t xTimeIncrement = pdMS_TO_TICKS(1000); // run every 1 second
     int sent_num  = 0;
+       const TickType_t xDelay = 1000 / portTICK_PERIOD_MS;
     while(1){
         vTaskDelayUntil(&xLastWakeTime, xTimeIncrement);
         if (xQueueGenericSend(msg_queue, (void *)&sent_num, portMAX_DELAY, queueSEND_TO_BACK) != pdTRUE) 
         {
             ESP_LOGI(TAG, "Queue full\n");
         }
+        vTaskDelay(xDelay);
         sent_num++;
         }
 }
 void core_comm(void* arg){
+    char mqttdata[10];
+
     const TickType_t xDelay = 500 / portTICK_PERIOD_MS;
     int data;  // data type should be same as queue item type
     int to_wait_ms = 100;  // the maximal blocking waiting time of millisecond
@@ -80,9 +84,10 @@ void core_comm(void* arg){
     while(1){
         if (xQueueReceive(msg_queue, (void *)&data, xTicksToWait) == pdTRUE) 
         {
+            sprintf(mqttdata,"%d",data);
             ESP_LOGI(TAG, "received data = %d", data);
+            esp_mqtt_client_publish(client, "/topic/sensor3", mqttdata, 0, 0, 0);
         } 
-            esp_mqtt_client_publish(client, "/topic/sensor2", "data", 0, 0, 0);
         }
 }
 
