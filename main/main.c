@@ -11,7 +11,6 @@ const static char *TAG = "main";
 #define TASK_PRIO_3         3
 #define CORE0       0
 #define CORE1       ((CONFIG_FREERTOS_NUMBER_OF_CORES > 1) ? 1 : tskNO_AFFINITY)
-#define QUEUE_CREATE_ERR_STR              "queue creation failed"
 
 
 void app_main(void)
@@ -21,7 +20,7 @@ void app_main(void)
 
     msg_queue = xQueueGenericCreate(msg_queue_len, sizeof(int), queueQUEUE_TYPE_SET);
     if (msg_queue == NULL) {
-        ESP_LOGE(TAG, QUEUE_CREATE_ERR_STR);
+        ESP_LOGE(TAG, "Error creating queue. Stopping!");
         return;
     }
 

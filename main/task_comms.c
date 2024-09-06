@@ -48,8 +48,7 @@ void task_comms(void* msg_queue)
 {
     char mqttdata[10];
     int data;  // data type should be same as queue item type
-    int to_wait_ms = 100;  // the maximal blocking waiting time of millisecond
-    const TickType_t xTicksToWait = pdMS_TO_TICKS(to_wait_ms);
+    const TickType_t xTicksToWait = pdMS_TO_TICKS(100); //read queue every 100ms
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = CONFIG_BROKER_URL,
     };
@@ -61,8 +60,9 @@ void task_comms(void* msg_queue)
     while(1){
         if (xQueueReceive(*(QueueHandle_t*)msg_queue, (void *)&data, xTicksToWait) == pdTRUE) 
         {
-            sprintf(mqttdata,"%d",data);
             ESP_LOGI(TAG, "received data = %d", data);
+
+            sprintf(mqttdata,"%d",data);
             esp_mqtt_client_publish(client, "/topic/sensor3", mqttdata, 0, 0, 0);
         } 
     }
