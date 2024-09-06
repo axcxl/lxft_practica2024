@@ -1,7 +1,11 @@
 {
 	"name": "ESP-IDF QEMU",
 	"build": {
-		"dockerfile": "Dockerfile"
+		"dockerfile": "Dockerfile",
+		"args": {
+			"--build-arg USER_UID=$(id -u)",
+			" --build-arg USER_GID=$(id -g)"
+		}
 	},
 	"customizations": {
 		"vscode": {
@@ -32,5 +36,7 @@
 			]
 		}
 	},
-	"runArgs": ["--privileged"]
+	"runArgs": ["--privileged"],
+	"remoteUser": "esp",
+	"containerUser": "esp"
 }

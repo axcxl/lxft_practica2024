@@ -12,6 +12,7 @@ RUN apt-get update \
   libglib2.0-0 \
   libnuma1 \
   libpixman-1-0 \
+  udev \
   && rm -rf /var/lib/apt/lists/*
 
 # QEMU
@@ -29,6 +30,8 @@ RUN wget --no-verbose ${QEMU_URL} \
   && rm ${QEMU_DIST}
 
 ENV PATH=/opt/qemu/bin:${PATH}
+
+RUN userdel -r ubuntu
 
 RUN groupadd --gid $USER_GID $CONTAINER_USER \
   && adduser --uid $USER_UID --gid $USER_GID --disabled-password --gecos "" ${CONTAINER_USER} \
