@@ -11,6 +11,7 @@
 
 static esp_eth_handle_t *s_eth_handles = NULL;
 static uint8_t s_eth_port_cnt = 0;
+static bool mqtt_is_connected = false;
 const static char *TAG = "comms";
 
 void init_ethernet_and_netif(void)
@@ -46,6 +47,56 @@ void init_ethernet_and_netif(void)
     }
 }
 
+static void log_error_if_nonzero(const char *message, int error_code)
+{
+    if (error_code != 0) {
+        ESP_LOGE(TAG, "Last error %s: 0x%x", message, error_code);
+    }
+}
+
+/*
+ * @brief Event handler registered to receive MQTT events
+ *
+ *  This function is called by the MQTT client event loop.
+ *
+ * @param handler_args user data registered to the event.
+ * @param base Event base for the handler(always MQTT Base in this example).
+ * @param event_id The id for the received event.
+ * @param event_data The data for the event, esp_mqtt_event_handle_t.
+ */
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    esp_mqtt_event_handle_t event = event_data;
+
+    switch ((esp_mqtt_event_id_t)event_id) {
+        case MQTT_EVENT_CONNECTED:
+            mqtt_is_connected = true;
+            ESP_LOGI(TAG, "MQTT connected!");
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            mqtt_is_connected = false;
+            ESP_LOGI(TAG, "MQTT disconnected!");
+            break;
+        case MQTT_EVENT_ERROR:
+            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+            if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+                log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
+                log_error_if_nonzero("reported from tls stack", event->error_handle->esp_tls_stack_err);
+                log_error_if_nonzero("captured as transport's socket errno",  event->error_handle->esp_transport_sock_errno);
+                ESP_LOGI(TAG, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
+
+            }
+            break;
+        default:
+            ESP_LOGI(TAG, "Other event id:%d", event->event_id);
+            break;
+    }
+}
+
+/*
+ * @brief Create a board id from last part of MAC address
+ *
+ */
 char *get_mqtt_board_id()
 {
     uint8_t mac_addr[BOARD_ID_LEN];
@@ -66,6 +117,7 @@ void task_comms(void* msg_queue)
     char mqttdata[10];
     char topic[BOARD_ID_LEN + 15] = "/topic/sensor_";
 
+    int msg_id;
     int data;  // data type should be same as queue item type
     const TickType_t xTicksToWait = pdMS_TO_TICKS(100); //read queue every 100ms
     esp_mqtt_client_config_t mqtt_cfg = {
@@ -77,15 +129,34 @@ void task_comms(void* msg_queue)
     strncat(topic, get_mqtt_board_id(), BOARD_ID_LEN);
 
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
+    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
 
     while(1){
         if (xQueueReceive(*(QueueHandle_t*)msg_queue, (void *)&data, xTicksToWait) == pdTRUE) 
         {
-            ESP_LOGI(TAG, "received data = %d, sending to %s", data, topic);
-
-            sprintf(mqttdata,"%d",data);
-            esp_mqtt_client_publish(client, topic, mqttdata, 0, 0, 0);
+            if(true == mqtt_is_connected)
+            {
+                ESP_LOGI(TAG, "received data = %d, sending to %s", data, topic);
+                sprintf(mqttdata,"%d",data);
+                msg_id = esp_mqtt_client_publish(client, topic, mqttdata, 0, 0, 0);
+                switch(msg_id)
+                {
+                    case -1:   
+                        ESP_LOGI(TAG, "error publishing!");
+                        break;
+                    case -2:
+                        ESP_LOGI(TAG, "full outbox!");
+                        break;
+                    default:
+                        ESP_LOGD(TAG, "sent message %d", msg_id);
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "received data = %d, ignoring (mqtt not connected)", data);
+            }
         } 
     }
 }
