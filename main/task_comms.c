@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "esp_log.h"
 #include "esp_eth.h"
 #include "esp_netif.h"
@@ -44,9 +46,26 @@ void init_ethernet_and_netif(void)
     }
 }
 
+char *get_mqtt_board_id()
+{
+    uint8_t mac_addr[BOARD_ID_LEN];
+    char *board_id;
+    esp_netif_t *esp_netif = esp_netif_next_unsafe(NULL); // we can use esp_netif_next_unsafe since we one time initialize the network and we don't de-init
+    esp_eth_handle_t eth_hndl = esp_netif_get_io_driver(esp_netif);
+
+    esp_eth_ioctl(eth_hndl, ETH_CMD_G_MAC_ADDR, mac_addr);
+
+    board_id = (char *)malloc(sizeof(char) * (BOARD_ID_LEN));
+    snprintf(board_id, (BOARD_ID_LEN + 1), "%02x%02x%02x", mac_addr[3], mac_addr[4], mac_addr[5]);
+
+    return board_id;
+}
+
 void task_comms(void* msg_queue)
 {
     char mqttdata[10];
+    char topic[BOARD_ID_LEN + 15] = "/topic/sensor_";
+
     int data;  // data type should be same as queue item type
     const TickType_t xTicksToWait = pdMS_TO_TICKS(100); //read queue every 100ms
     esp_mqtt_client_config_t mqtt_cfg = {
@@ -54,16 +73,19 @@ void task_comms(void* msg_queue)
     };
 
     init_ethernet_and_netif();
+
+    strncat(topic, get_mqtt_board_id(), BOARD_ID_LEN);
+
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_start(client);
 
     while(1){
         if (xQueueReceive(*(QueueHandle_t*)msg_queue, (void *)&data, xTicksToWait) == pdTRUE) 
         {
-            ESP_LOGI(TAG, "received data = %d", data);
+            ESP_LOGI(TAG, "received data = %d, sending to %s", data, topic);
 
             sprintf(mqttdata,"%d",data);
-            esp_mqtt_client_publish(client, "/topic/sensor3", mqttdata, 0, 0, 0);
+            esp_mqtt_client_publish(client, topic, mqttdata, 0, 0, 0);
         } 
     }
 }
