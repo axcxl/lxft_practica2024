@@ -10,7 +10,9 @@
 	"idf.toolsPath": "/opt/esp",
     "idf.flashType": "UART",
     "files.associations": {
-        "ethernet_init.h": "c"
+        "ethernet_init.h": "c",
+        "freertos.h": "c",
+        "task_sensors.h": "c"
     },
     "idf.gitPath": "git"
 }
