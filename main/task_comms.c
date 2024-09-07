@@ -8,6 +8,7 @@
 #include "esp_mac.h"
 #include "mqtt_client.h"
 #include "h/task_comms.h"
+#include "h/sensor_queue.h"
 
 static esp_eth_handle_t *s_eth_handles = NULL;
 static uint8_t s_eth_port_cnt = 0;
@@ -115,18 +116,16 @@ char *get_mqtt_board_id()
 void task_comms(void* msg_queue)
 {
     char mqttdata[10];
-    char topic[BOARD_ID_LEN + 15] = "/topic/sensor_";
-
+    char topic_fmt[] = "/sensor_%s/%s";
+    char topic[20];
     int msg_id;
-    int data;  // data type should be same as queue item type
-    const TickType_t xTicksToWait = pdMS_TO_TICKS(100); //read queue every 100ms
+    sensq data;  // data type should be same as queue item type
+    const TickType_t xTicksToWait = pdMS_TO_TICKS(1000); //read queue every 100ms
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = CONFIG_BROKER_URL,
     };
 
     init_ethernet_and_netif();
-
-    strncat(topic, get_mqtt_board_id(), BOARD_ID_LEN);
 
     esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
     /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
@@ -136,26 +135,28 @@ void task_comms(void* msg_queue)
     while(1){
         if (xQueueReceive(*(QueueHandle_t*)msg_queue, (void *)&data, xTicksToWait) == pdTRUE) 
         {
-            if(true == mqtt_is_connected)
+            if(false == mqtt_is_connected)
             {
-                ESP_LOGI(TAG, "received data = %d, sending to %s", data, topic);
-                sprintf(mqttdata,"%d",data);
-                msg_id = esp_mqtt_client_publish(client, topic, mqttdata, 0, 0, 0);
-                switch(msg_id)
-                {
-                    case -1:   
-                        ESP_LOGI(TAG, "error publishing!");
-                        break;
-                    case -2:
-                        ESP_LOGI(TAG, "full outbox!");
-                        break;
-                    default:
-                        ESP_LOGD(TAG, "sent message %d", msg_id);
-                }
+                ESP_LOGI(TAG, "received data = %.2f(%d), ignoring (mqtt not connected)", data.value, (int)data.type);
+                continue;
             }
-            else
+
+            /* Prepare topic and data to send */
+            snprintf(mqttdata, 10, "%.2f",data.value);
+            snprintf(topic, 100, topic_fmt, get_mqtt_board_id(), sensq_string[data.type]);
+
+            ESP_LOGI(TAG, "received data = %.2f (type=%d), sending to %s", data.value, (int)data.type, topic);
+            msg_id = esp_mqtt_client_publish(client, topic, mqttdata, 0, 0, 0);
+            switch(msg_id)
             {
-                ESP_LOGI(TAG, "received data = %d, ignoring (mqtt not connected)", data);
+                case -1:   
+                    ESP_LOGI(TAG, "error publishing!");
+                    break;
+                case -2:
+                    ESP_LOGI(TAG, "full outbox!");
+                    break;
+                default:
+                    ESP_LOGD(TAG, "sent message %d", msg_id);
             }
         } 
     }

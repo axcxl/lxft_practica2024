@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "h/task_comms.h"
 #include "h/task_sensors.h"
+#include "h/sensor_queue.h"
 #include "freertos/FreeRTOS.h"
 
 const static char *TAG = "main";
@@ -16,9 +17,9 @@ const static char *TAG = "main";
 void app_main(void)
 {
     static QueueHandle_t msg_queue;
-    static const uint8_t msg_queue_len = 40;
 
-    msg_queue = xQueueGenericCreate(msg_queue_len, sizeof(int), queueQUEUE_TYPE_SET);
+    /* Create main queue for passing info from sensor reading to the comms part */
+    msg_queue = xQueueGenericCreate(SENSQ_LEN, sizeof(sensq), queueQUEUE_TYPE_SET);
     if (msg_queue == NULL) {
         ESP_LOGE(TAG, "Error creating queue. Stopping!");
         return;
